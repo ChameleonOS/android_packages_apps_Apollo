@@ -55,7 +55,7 @@ public class ImageFetcher extends ImageWorker {
 
     /**
      * Creates a new instance of {@link ImageFetcher}.
-     * 
+     *
      * @param context The {@link Context} to use.
      */
     public ImageFetcher(final Context context) {
@@ -64,7 +64,7 @@ public class ImageFetcher extends ImageWorker {
 
     /**
      * Used to create a singleton of the image fetcher
-     * 
+     *
      * @param context The {@link Context} to use
      * @return A new instance of this class.
      */
@@ -104,7 +104,7 @@ public class ImageFetcher extends ImageWorker {
         switch (imageType) {
             case ARTIST:
                 if (!TextUtils.isEmpty(artistName)) {
-                    if (PreferenceUtils.getInstace(mContext).downloadMissingArtistImages()) {
+                    if (PreferenceUtils.getInstance(mContext).downloadMissingArtistImages()) {
                         final PaginatedResult<Image> paginatedResult = Artist.getImages(mContext,
                                 artistName);
                         if (paginatedResult != null) {
@@ -122,7 +122,7 @@ public class ImageFetcher extends ImageWorker {
                 break;
             case ALBUM:
                 if (!TextUtils.isEmpty(artistName) && !TextUtils.isEmpty(albumName)) {
-                    if (PreferenceUtils.getInstace(mContext).downloadMissingArtwork()) {
+                    if (PreferenceUtils.getInstance(mContext).downloadMissingArtwork()) {
                         final Artist correction = Artist.getCorrection(mContext, artistName);
                         if (correction != null) {
                             final Album album = Album.getInfo(mContext, correction.getName(),
@@ -148,7 +148,7 @@ public class ImageFetcher extends ImageWorker {
      */
     public void loadAlbumImage(final String artistName, final String albumName, final long albumId,
             final ImageView imageView) {
-        loadImage(albumName + Config.ALBUM_ART_SUFFIX, artistName, albumName, albumId, imageView,
+        loadImage(generateAlbumCacheKey(albumName, artistName), artistName, albumName, albumId, imageView,
                 ImageType.ALBUM);
     }
 
@@ -156,8 +156,8 @@ public class ImageFetcher extends ImageWorker {
      * Used to fetch the current artwork.
      */
     public void loadCurrentArtwork(final ImageView imageView) {
-        loadImage(MusicUtils.getAlbumName() + Config.ALBUM_ART_SUFFIX, MusicUtils.getArtistName(),
-                MusicUtils.getAlbumName(), MusicUtils.getCurrentAlbumId(),
+        loadImage(generateAlbumCacheKey(MusicUtils.getAlbumName(), MusicUtils.getArtistName()),
+                MusicUtils.getArtistName(), MusicUtils.getAlbumName(), MusicUtils.getCurrentAlbumId(),
                 imageView, ImageType.ALBUM);
     }
 
@@ -214,12 +214,25 @@ public class ImageFetcher extends ImageWorker {
     }
 
     /**
-     * @param key The key used to find the album art to return
+     * @param keyAlbum The key (album name) used to find the album art to return
+     * @param keyArtist The key (artist name) used to find the album art to return
      */
-    public Bitmap getCachedArtwork(final String key) {
+    public Bitmap getCachedArtwork(final String keyAlbum, final String keyArtist) {
+        return getCachedArtwork(keyAlbum, keyArtist,
+                MusicUtils.getIdForAlbum(mContext, keyAlbum, keyArtist));
+    }
+
+    /**
+     * @param keyAlbum The key (album name) used to find the album art to return
+     * @param keyArtist The key (artist name) used to find the album art to return
+     * @param keyId The key (album id) used to find the album art to return
+     */
+    public Bitmap getCachedArtwork(final String keyAlbum, final String keyArtist,
+            final long keyId) {
         if (mImageCache != null) {
-            return mImageCache.getCachedArtwork(mContext, key + Config.ALBUM_ART_SUFFIX,
-                    MusicUtils.getIdForAlbum(mContext, key));
+            return mImageCache.getCachedArtwork(mContext,
+                    generateAlbumCacheKey(keyAlbum, keyArtist),
+                    keyId);
         }
         return getDefaultArtwork();
     }
@@ -227,7 +240,7 @@ public class ImageFetcher extends ImageWorker {
     /**
      * Finds cached or downloads album art. Used in {@link MusicPlaybackService}
      * to set the current album art in the notification and lock screen
-     * 
+     *
      * @param albumName The name of the current album
      * @param albumId The ID of the current album
      * @param artistName The album artist in case we should have to download
@@ -239,7 +252,8 @@ public class ImageFetcher extends ImageWorker {
         Bitmap artwork = null;
 
         if (artwork == null && albumName != null && mImageCache != null) {
-            artwork = mImageCache.getBitmapFromDiskCache(albumName + Config.ALBUM_ART_SUFFIX);
+            artwork = mImageCache.getBitmapFromDiskCache(
+                    generateAlbumCacheKey(albumName, artistName));
         }
         if (artwork == null && albumId >= 0 && mImageCache != null) {
             // Check for local artwork
@@ -259,7 +273,7 @@ public class ImageFetcher extends ImageWorker {
     /**
      * Download a {@link Bitmap} from a URL, write it to a disk and return the
      * File pointer. This implementation uses a simple disk cache.
-     * 
+     *
      * @param context The context to use
      * @param urlString The URL to fetch
      * @return A {@link File} pointing to the fetched bitmap
@@ -310,7 +324,7 @@ public class ImageFetcher extends ImageWorker {
     /**
      * Decode and sample down a {@link Bitmap} from a file to the requested
      * width and height.
-     * 
+     *
      * @param filename The full path of the file to decode
      * @param reqWidth The requested width of the resulting bitmap
      * @param reqHeight The requested height of the resulting bitmap
@@ -344,7 +358,7 @@ public class ImageFetcher extends ImageWorker {
      * a power of 2 is returned for inSampleSize which can be faster when
      * decoding but results in a larger bitmap which isn't as useful for caching
      * purposes.
-     * 
+     *
      * @param options An options object with out* params already populated (run
      *            through a decode* method with inJustDecodeBounds==true
      * @param reqWidth The requested width of the resulting bitmap
@@ -382,5 +396,26 @@ public class ImageFetcher extends ImageWorker {
             }
         }
         return inSampleSize;
+    }
+
+    /**
+     * Generates key used by album art cache. It needs both album name and artist name
+     * to let to select correct image for the case when there are two albums with the
+     * same artist.
+     *
+     * @param albumName The album name the cache key needs to be generated.
+     * @param artistName The artist name the cache key needs to be generated.
+     * @return
+     */
+    public static String generateAlbumCacheKey(final String albumName, final String artistName) {
+        if (albumName == null || artistName == null) {
+            return null;
+        }
+        return new StringBuilder(albumName)
+                .append("_")
+                .append(artistName)
+                .append("_")
+                .append(Config.ALBUM_ART_SUFFIX)
+                .toString();
     }
 }

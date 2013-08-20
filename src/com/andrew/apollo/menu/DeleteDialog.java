@@ -33,6 +33,10 @@ import com.andrew.apollo.utils.MusicUtils;
  */
 public class DeleteDialog extends DialogFragment {
 
+    public interface DeleteDialogCallback {
+        public void onDelete(long[] id);
+    }
+
     /**
      * The item(s) to delete
      */
@@ -78,10 +82,11 @@ public class DeleteDialog extends DialogFragment {
         mItemList = arguments.getLongArray("items");
         // Get the dialog title
         final String title = arguments.getString(Config.NAME);
+        final String dialogTitle = getString(R.string.delete_dialog_title, title);
         // Initialize the image cache
         mFetcher = ApolloUtils.getImageFetcher(getActivity());
         // Build the dialog
-        return new AlertDialog.Builder(getActivity()).setTitle(delete + " " + title)
+        return new AlertDialog.Builder(getActivity()).setTitle(dialogTitle)
                 .setMessage(R.string.cannot_be_undone)
                 .setPositiveButton(delete, new OnClickListener() {
 
@@ -91,6 +96,9 @@ public class DeleteDialog extends DialogFragment {
                         mFetcher.removeFromCache(key);
                         // Delete the selected item(s)
                         MusicUtils.deleteTracks(getActivity(), mItemList);
+                        if (getActivity() instanceof DeleteDialogCallback) {
+                            ((DeleteDialogCallback)getActivity()).onDelete(mItemList);
+                        }
                         dialog.dismiss();
                     }
                 }).setNegativeButton(R.string.cancel, new OnClickListener() {

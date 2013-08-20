@@ -71,6 +71,17 @@ public final class ApolloUtils {
     }
 
     /**
+     * Used to determine if the device is running
+     * Jelly Bean MR2 (Android 4.3) or greater
+     *
+     * @return True if the device is running Jelly Bean MR2 or greater,
+     *         false otherwise
+     */
+    public static final boolean hasJellyBeanMR2() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2;
+    }
+
+    /**
      * Used to determine if the device is a tablet or not
      * 
      * @param context The {@link Context} to use.
@@ -135,7 +146,7 @@ public final class ApolloUtils {
         }
 
         boolean state = false;
-        final boolean onlyOnWifi = PreferenceUtils.getInstace(context).onlyOnWifi();
+        final boolean onlyOnWifi = PreferenceUtils.getInstance(context).onlyOnWifi();
 
         /* Monitor network connections */
         final ConnectivityManager connectivityManager = (ConnectivityManager)context
@@ -276,13 +287,14 @@ public final class ApolloUtils {
      * @param mimeType The MIME type of the shortcut
      * @param context The {@link Context} to use to
      */
-    public static void createShortcutIntent(final String displayName, final Long id,
-            final String mimeType, final Activity context) {
+    public static void createShortcutIntent(final String displayName, final String artistName,
+            final Long id, final String mimeType, final Activity context) {
         try {
             final ImageFetcher fetcher = getImageFetcher(context);
             Bitmap bitmap = null;
             if (mimeType.equals(MediaStore.Audio.Albums.CONTENT_TYPE)) {
-                bitmap = fetcher.getCachedBitmap(displayName + Config.ALBUM_ART_SUFFIX);
+                bitmap = fetcher.getCachedBitmap(
+                        ImageFetcher.generateAlbumCacheKey(displayName, artistName));
             } else {
                 bitmap = fetcher.getCachedBitmap(displayName);
             }
@@ -308,14 +320,13 @@ public final class ApolloUtils {
             intent.setAction("com.android.launcher.action.INSTALL_SHORTCUT");
             context.sendBroadcast(intent);
             AppMsg.makeText(context,
-                    displayName + " " + context.getString(R.string.pinned_to_home_screen),
+                    context.getString(R.string.pinned_to_home_screen, displayName),
                     AppMsg.STYLE_CONFIRM).show();
         } catch (final Exception e) {
             Log.e("ApolloUtils", "createShortcutIntent", e);
             AppMsg.makeText(
                     context,
-                    displayName + " "
-                            + context.getString(R.string.could_not_be_pinned_to_home_screen),
+                    context.getString(R.string.could_not_be_pinned_to_home_screen, displayName),
                     AppMsg.STYLE_ALERT).show();
         }
     }
@@ -332,7 +343,7 @@ public final class ApolloUtils {
 
                     @Override
                     public void onClick(final DialogInterface dialog, final int which) {
-                        PreferenceUtils.getInstace(context).setDefaultThemeColor(
+                        PreferenceUtils.getInstance(context).setDefaultThemeColor(
                                 colorPickerView.getColor());
                     }
                 });
@@ -340,4 +351,23 @@ public final class ApolloUtils {
                 context.getString(R.string.cancel), (OnClickListener) null);
         colorPickerView.show();
     }
+
+    /**
+     * Method that removes the support for HardwareAcceleration from a {@link View}.<br/>
+     * <br/>
+     * Check AOSP notice:<br/>
+     * <pre>
+     * 'ComposeShader can only contain shaders of different types (a BitmapShader and a
+     * LinearGradient for instance, but not two instances of BitmapShader)'. But, 'If your
+     * application is affected by any of these missing features or limitations, you can turn
+     * off hardware acceleration for just the affected portion of your application by calling
+     * setLayerType(View.LAYER_TYPE_SOFTWARE, null).'</pre>
+     *
+     * @param v The view
+     */
+    public static void removeHardwareAccelerationSupport(View v) {
+        if (v.getLayerType() != View.LAYER_TYPE_SOFTWARE) {
+            v.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
+   }
 }

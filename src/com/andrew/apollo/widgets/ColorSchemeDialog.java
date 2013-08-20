@@ -23,6 +23,7 @@ import android.widget.Button;
 import android.widget.EditText;
 
 import com.andrew.apollo.R;
+import com.andrew.apollo.utils.ApolloUtils;
 import com.andrew.apollo.utils.PreferenceUtils;
 import com.andrew.apollo.widgets.ColorPickerView.OnColorChangedListener;
 
@@ -60,8 +61,14 @@ public class ColorSchemeDialog extends AlertDialog implements
     public ColorSchemeDialog(final Context context) {
         super(context);
         getWindow().setFormat(PixelFormat.RGBA_8888);
-        mCurrentColor = PreferenceUtils.getInstace(context).getDefaultThemeColor(context);
+        mCurrentColor = PreferenceUtils.getInstance(context).getDefaultThemeColor(context);
         setUp(mCurrentColor);
+    }
+
+    @Override
+    public void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        ApolloUtils.removeHardwareAccelerationSupport(mColorPicker);
     }
 
     /*
